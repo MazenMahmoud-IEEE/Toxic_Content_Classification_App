@@ -11,7 +11,7 @@ from peft import PeftModel
 # Load fine-tuned model + tokenizer
 # -------------------------
 BASE_MODEL = "distilroberta-base"  
-BEST_CHECKPOINT = ".\checkpoint-66"
+BEST_CHECKPOINT = "./checkpoint-66"
 
 # Custom label mapping (from your LabelEncoder)
 id2label = {
@@ -107,4 +107,5 @@ elif option == "Image":
 if st.checkbox("📂 View Database"):
     df = pd.read_csv(DB_FILE)
     st.dataframe(df)
+
 
