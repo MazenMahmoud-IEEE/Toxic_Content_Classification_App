@@ -6,15 +6,14 @@ import torch
 from text_extractor import generate_caption
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
 from peft import PeftModel
-from PIL import Image
 
 # -------------------------
-# Model configuration
+# Model setup
 # -------------------------
 BASE_MODEL = "distilroberta-base"
-BEST_CHECKPOINT = "./checkpoint-66"  # relative path in your GitHub repo
+BEST_CHECKPOINT = "./checkpoint-66"
 
-# Label mapping
+# Custom label mapping
 id2label = {
     0: "Child Sexual Exploitation",
     1: "Elections",
@@ -28,11 +27,10 @@ id2label = {
 }
 label2id = {v: k for k, v in id2label.items()}
 
-# -------------------------
-# Load tokenizer and base model
-# -------------------------
+# Tokenizer
 tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
 
+# Load base model architecture
 base_model = AutoModelForSequenceClassification.from_pretrained(
     BASE_MODEL,
     num_labels=len(id2label),
@@ -41,25 +39,23 @@ base_model = AutoModelForSequenceClassification.from_pretrained(
     ignore_mismatched_sizes=True
 )
 
-# -------------------------
 # Load LoRA adapter
-# -------------------------
-model = PeftModel.from_pretrained(
+lora_model = PeftModel.from_pretrained(
     base_model,
     BEST_CHECKPOINT,
     torch_dtype=torch.float32,
-    device_map="auto"  # automatically handles CPU/GPU on Streamlit Cloud
+    device_map="cpu"  # force CPU
 )
 
-# -------------------------
-# Hugging Face pipeline
-# -------------------------
-device = 0 if torch.cuda.is_available() else -1
+# Merge LoRA adapter into base model for inference
+model = lora_model.merge_and_unload()
+
+# Hugging Face pipeline for inference
 classifier = pipeline(
     "text-classification",
     model=model,
     tokenizer=tokenizer,
-    device=device
+    device=-1  # CPU
 )
 
 # -------------------------
@@ -77,17 +73,17 @@ st.title("🧠 Toxic Content Detection App")
 
 option = st.radio("Choose input type:", ["Text", "Image"])
 
+# Text classification
 if option == "Text":
     user_text = st.text_area("Enter your text:")
     if st.button("Classify Text"):
         if user_text.strip() != "":
-            # Run classification
             result = classifier(user_text, top_k=1)[0]
             prediction = f"{result['label']} ({result['score']:.2f})"
 
             st.success(f"Classification: {prediction}")
 
-            # Save to DB
+            # Save to database
             df = pd.read_csv(DB_FILE)
             df = pd.concat([df, pd.DataFrame([[user_text, prediction]], columns=df.columns)],
                            ignore_index=True)
@@ -95,30 +91,28 @@ if option == "Text":
         else:
             st.warning("Please enter some text.")
 
+# Image classification
 elif option == "Image":
     uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
     if uploaded_image is not None:
         st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
         if st.button("Generate Caption & Classify"):
-            # Generate caption using BLIP
+            # Generate caption
             caption = generate_caption(uploaded_image)
             st.info(f"Generated Caption: {caption}")
 
             # Run classification
             result = classifier(caption, top_k=1)[0]
             prediction = f"{result['label']} ({result['score']:.2f})"
-
             st.success(f"Classification: {prediction}")
 
-            # Save to DB
+            # Save to database
             df = pd.read_csv(DB_FILE)
             df = pd.concat([df, pd.DataFrame([[caption, prediction]], columns=df.columns)],
                            ignore_index=True)
             df.to_csv(DB_FILE, index=False)
 
-# -------------------------
 # Database viewer
-# -------------------------
 if st.checkbox("📂 View Database"):
     df = pd.read_csv(DB_FILE)
     st.dataframe(df)
