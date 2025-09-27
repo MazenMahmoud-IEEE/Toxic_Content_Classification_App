@@ -10,22 +10,8 @@ from peft import PeftModel
 # -------------------------
 # Load fine-tuned model + tokenizer
 # -------------------------
-BASE_MODEL = "distilroberta-base"  
+BASE_MODEL = "distilroberta-base"
 BEST_CHECKPOINT = "./checkpoint-66"
-
-# Custom label mapping (from your LabelEncoder)
-id2label = {
-    0: "Child Sexual Exploitation",
-    1: "Elections",
-    2: "Non-Violent Crimes",
-    3: "Safe",
-    4: "Sex-Related Crimes",
-    5: "Suicide & Self-Harm",
-    6: "Unknown S-Type",
-    7: "Violent Crimes",
-    8: "unsafe"
-}
-label2id = {v: k for k, v in id2label.items()}
 
 # Tokenizer always comes from the base model
 tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
@@ -39,12 +25,25 @@ base_model = AutoModelForSequenceClassification.from_pretrained(
     ignore_mismatched_sizes=True
 )
 
-# Attach LoRA adapter (fine-tuned weights from checkpoint)
-model = PeftModel.from_pretrained(base_model, BEST_CHECKPOINT)
+# Load LoRA adapter
+model = PeftModel.from_pretrained(
+    base_model,
+    BEST_CHECKPOINT,
+    torch_dtype=torch.float32,  # ensure proper dtype
+    device_map="cpu"             # force CPU (Streamlit Cloud)
+)
+
+# Merge LoRA adapter into base model for inference
+model = model.merge_and_unload()
 
 # Hugging Face pipeline for inference
-device = 0 if torch.cuda.is_available() else -1
-classifier = pipeline("text-classification", model=model, tokenizer=tokenizer, device=device)
+classifier = pipeline(
+    "text-classification",
+    model=model,
+    tokenizer=tokenizer,
+    device=-1  # CPU
+)
+
 
 # -------------------------
 # Database setup
@@ -107,6 +106,7 @@ elif option == "Image":
 if st.checkbox("📂 View Database"):
     df = pd.read_csv(DB_FILE)
     st.dataframe(df)
+
 
 
 
