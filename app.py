@@ -42,9 +42,6 @@ base_model = AutoModelForSequenceClassification.from_pretrained(
 # Attach LoRA adapter (fine-tuned weights from checkpoint)
 model = PeftModel.from_pretrained(base_model, BEST_CHECKPOINT)
 
-# Merge adapter into base model for pure inference
-model = model.merge_and_unload() 
-
 # Hugging Face pipeline for inference
 device = 0 if torch.cuda.is_available() else -1
 classifier = pipeline("text-classification", model=model, tokenizer=tokenizer, device=device)
@@ -110,6 +107,7 @@ elif option == "Image":
 if st.checkbox("📂 View Database"):
     df = pd.read_csv(DB_FILE)
     st.dataframe(df)
+
 
 
 
