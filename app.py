@@ -41,7 +41,8 @@ base_model = AutoModelForSequenceClassification.from_pretrained(
 
 # Attach LoRA adapter (fine-tuned weights from checkpoint)
 model = PeftModel.from_pretrained(base_model, BEST_CHECKPOINT ,torch_dtype=torch.float32,
-    device_map="cpu"  # use "auto" if GPU available)
+    device_map="cpu"  # use "auto" if GPU available
+                                 )
 
 # Hugging Face pipeline for inference
 device = 0 if torch.cuda.is_available() else -1
@@ -108,6 +109,7 @@ elif option == "Image":
 if st.checkbox("📂 View Database"):
     df = pd.read_csv(DB_FILE)
     st.dataframe(df)
+
 
 
 
