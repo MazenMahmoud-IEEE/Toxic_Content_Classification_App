@@ -1,4 +1,4 @@
-# app.py 
+# app.py
 import streamlit as st
 import pandas as pd
 import os
@@ -6,15 +6,15 @@ import torch
 from text_extractor import generate_caption
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
 from peft import PeftModel
+from PIL import Image
 
 # -------------------------
-# Load fine-tuned model + tokenizer
+# Model configuration
 # -------------------------
 BASE_MODEL = "distilroberta-base"
-BEST_CHECKPOINT = "./checkpoint-66"
+BEST_CHECKPOINT = "./checkpoint-66"  # relative path in your GitHub repo
 
-
-# Custom label mapping (from your LabelEncoder)
+# Label mapping
 id2label = {
     0: "Child Sexual Exploitation",
     1: "Elections",
@@ -28,10 +28,11 @@ id2label = {
 }
 label2id = {v: k for k, v in id2label.items()}
 
-# Tokenizer always comes from the base model
+# -------------------------
+# Load tokenizer and base model
+# -------------------------
 tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
 
-# Load base model architecture
 base_model = AutoModelForSequenceClassification.from_pretrained(
     BASE_MODEL,
     num_labels=len(id2label),
@@ -40,31 +41,31 @@ base_model = AutoModelForSequenceClassification.from_pretrained(
     ignore_mismatched_sizes=True
 )
 
+# -------------------------
 # Load LoRA adapter
+# -------------------------
 model = PeftModel.from_pretrained(
     base_model,
     BEST_CHECKPOINT,
-    torch_dtype=torch.float32,  # ensure proper dtype
-    device_map="cpu"             # force CPU (Streamlit Cloud)
+    torch_dtype=torch.float32,
+    device_map="auto"  # automatically handles CPU/GPU on Streamlit Cloud
 )
 
-# Merge LoRA adapter into base model for inference
-model = model.merge_and_unload()
-
-# Hugging Face pipeline for inference
+# -------------------------
+# Hugging Face pipeline
+# -------------------------
+device = 0 if torch.cuda.is_available() else -1
 classifier = pipeline(
     "text-classification",
     model=model,
     tokenizer=tokenizer,
-    device=-1  # CPU
+    device=device
 )
-
 
 # -------------------------
 # Database setup
 # -------------------------
 DB_FILE = "database.csv"
-
 if not os.path.exists(DB_FILE):
     df = pd.DataFrame(columns=["input_text_or_caption", "classification"])
     df.to_csv(DB_FILE, index=False)
@@ -88,8 +89,8 @@ if option == "Text":
 
             # Save to DB
             df = pd.read_csv(DB_FILE)
-            df = pd.concat([df, pd.DataFrame([[user_text, prediction]],
-                                             columns=df.columns)], ignore_index=True)
+            df = pd.concat([df, pd.DataFrame([[user_text, prediction]], columns=df.columns)],
+                           ignore_index=True)
             df.to_csv(DB_FILE, index=False)
         else:
             st.warning("Please enter some text.")
@@ -99,7 +100,7 @@ elif option == "Image":
     if uploaded_image is not None:
         st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
         if st.button("Generate Caption & Classify"):
-            # Generate caption with BLIP
+            # Generate caption using BLIP
             caption = generate_caption(uploaded_image)
             st.info(f"Generated Caption: {caption}")
 
@@ -111,21 +112,13 @@ elif option == "Image":
 
             # Save to DB
             df = pd.read_csv(DB_FILE)
-            df = pd.concat([df, pd.DataFrame([[caption, prediction]],
-                                             columns=df.columns)], ignore_index=True)
+            df = pd.concat([df, pd.DataFrame([[caption, prediction]], columns=df.columns)],
+                           ignore_index=True)
             df.to_csv(DB_FILE, index=False)
 
 # -------------------------
-# Database Viewer
+# Database viewer
 # -------------------------
 if st.checkbox("📂 View Database"):
     df = pd.read_csv(DB_FILE)
     st.dataframe(df)
-
-
-
-
-
-
-
-
