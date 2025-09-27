@@ -13,6 +13,21 @@ from peft import PeftModel
 BASE_MODEL = "distilroberta-base"
 BEST_CHECKPOINT = "./checkpoint-66"
 
+
+# Custom label mapping (from your LabelEncoder)
+id2label = {
+    0: "Child Sexual Exploitation",
+    1: "Elections",
+    2: "Non-Violent Crimes",
+    3: "Safe",
+    4: "Sex-Related Crimes",
+    5: "Suicide & Self-Harm",
+    6: "Unknown S-Type",
+    7: "Violent Crimes",
+    8: "unsafe"
+}
+label2id = {v: k for k, v in id2label.items()}
+
 # Tokenizer always comes from the base model
 tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
 
@@ -106,6 +121,7 @@ elif option == "Image":
 if st.checkbox("📂 View Database"):
     df = pd.read_csv(DB_FILE)
     st.dataframe(df)
+
 
 
 
